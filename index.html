@@ -24,6 +24,18 @@ td input{padding:6px;min-width:56px}label{font-size:13px;color:var(--mu);display
 .rp{background:#fff;color:#000;max-width:720px;margin:12px auto;padding:20px;border:2px solid #000}
 .rp table{color:#000}.rp th,.rp td{border:1px solid #444;padding:5px}
 @media print{body>*:not(.ov){display:none!important}.ov{position:static;padding:0}.np{display:none!important}.rp{border:2px solid #000;margin:0 auto}}
+.lg{position:relative;overflow:hidden;border-radius:16px;padding:22px 14px 18px;background:linear-gradient(160deg,#0f6b4a,#0b3d2c 60%,#10243a);color:#fff;min-height:78vh}
+.lg .fl{position:absolute;bottom:-40px;font-size:28px;opacity:.55;animation:up 9s linear infinite}
+@keyframes up{to{transform:translateY(-110vh) rotate(25deg)}}
+.lg .c{position:relative;z-index:1}
+.bk{display:block;margin:0 auto 4px;width:130px;height:86px;position:relative;z-index:1}
+.pg{transform-box:fill-box;transform-origin:0 50%;animation:flip 3s ease-in-out infinite}
+@keyframes flip{0%,100%{transform:scaleX(1)}50%{transform:scaleX(-1)}}
+.pw{position:relative;z-index:1;text-align:center;margin-top:18px;font-size:13px;animation:glow 2.4s ease-in-out infinite}
+@keyframes glow{0%,100%{text-shadow:0 0 4px #7dffc4;opacity:.8}50%{text-shadow:0 0 14px #7dffc4,0 0 28px #3fbf8c;opacity:1}}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#7dffc4;margin-right:8px;animation:rad 2s infinite}
+@keyframes rad{0%{box-shadow:0 0 0 0 rgba(125,255,196,.7)}100%{box-shadow:0 0 0 14px rgba(125,255,196,0)}}
+@media(prefers-reduced-motion:reduce){.lg *{animation:none!important}}
 </style></head><body>
 <header><h1 id="ttl"></h1><small id="sub"></small> · <small id="ind"></small></header>
 <nav id="nav"></nav><main id="m"></main>
@@ -109,7 +121,7 @@ else if(p[0]==='att'){(db.att[x]=db.att[x]||{})[p[1]]=v}}}
 async function push(){if(!me)return;const s=shards(),rows=[];for(const k in s){const j=JSON.stringify(s[k]);if(last[k]!==j)rows.push({key:k,val:s[k],updated_by:me.id,j})}
 if(!rows.length)return;ind('Saving…');const {error}=await sb.from('kv').upsert(rows.map(({j,...r})=>r));if(error)return ind('Not saved: '+error.message);rows.forEach(r=>last[r.key]=r.j);ind('Saved ✓')}
 async function loadAll(){const {data,error}=await sb.from('kv').select('key,val');if(error)return say(error.message);unshard(data);last=shards()}
-function loginUI(msg){$('#nav').innerHTML='';$('#m').innerHTML=`<div class="c"><h3>Sign in</h3>${msg?`<p class="d">${esc(msg)}</p>`:''}<label>Full name (new accounts only)</label><input id="an"><label>Email</label><input id="ae" type="email"><label>Password (min 6 characters)</label><input id="ap" type="password"><p><button class="b" onclick="auth(0)">Log in</button> <button class="b g" onclick="auth(1)">Create account</button></p></div>`}
+function loginUI(msg){$('#nav').innerHTML='';$('#ttl').textContent='School Manager';$('#sub').textContent='Results · Fees · Attendance';$('#m').innerHTML=`<div class="lg">${['📚','✏️','🎓','📖','🍎','🧮','🔬','📝'].map((e,i)=>`<span class="fl" style="left:${i*13+2}%;animation-delay:${i*-1.1}s;animation-duration:${8+i%3*2}s">${e}</span>`).join('')}<svg class="bk" viewBox="0 0 120 80"><path d="M60 14C44 6 22 8 8 14v52c14-6 36-8 52 0z" fill="#fff"/><path d="M60 14c16-8 38-6 52 0v52c-14-6-36-8-52 0z" fill="#e6f4ec"/><path class="pg" d="M60 14c16-8 38-6 52 0v52c-14-6-36-8-52 0z" fill="#fff" stroke="#0f6b4a" stroke-width="1"/><path d="M60 14v52" stroke="#0f6b4a" stroke-width="2"/></svg><h2 style="text-align:center;margin:4px 0 14px;position:relative;z-index:1">Welcome</h2><div class="c"><h3 style="margin-top:0">Sign in</h3>${msg?`<p class="d">${esc(msg)}</p>`:''}<label>Full name (new accounts only)</label><input id="an"><label>Email</label><input id="ae" type="email"><label>Password (min 6 characters)</label><input id="ap" type="password"><p><button class="b" onclick="auth(0)">Log in</button> <button class="b g" onclick="auth(1)">Create account</button></p></div><div class="pw"><span class="dot"></span>Powered by <b>Softsub Digital</b> · 09126459668</div></div>`}
 async function auth(up){const e=$('#ae').value.trim(),p=$('#ap').value;const r=up?await sb.auth.signUp({email:e,password:p,options:{data:{name:$('#an').value}}}):await sb.auth.signInWithPassword({email:e,password:p});if(r.error)return loginUI(r.error.message);if(up&&!r.data.session)return loginUI('Account created. Please log in.');boot()}
 function waitUI(){$('#nav').innerHTML='';$('#m').innerHTML='<div class="c"><h3>Waiting for approval</h3><p>Ask the school admin to approve your account, then tap Refresh.</p><button class="b" onclick="boot()">Refresh</button> <button class="b g" onclick="out()">Log out</button></div>'}
 const out=()=>sb.auth.signOut().then(boot);
