@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>School Manager</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f6f7f4;--card:#fff;--tx:#1b2a22;--mu:#66756c;--pr:#0f6b4a;--pt:#fff;--bd:#dfe4de;--bad:#b3261e}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101613;--card:#18211c;--tx:#e8eee9;--mu:#92a39a;--pr:#3fbf8c;--pt:#06231a;--bd:#2a3730;--bad:#ff8a80}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{padding:14px 16px 0}h1{margin:0;font-size:19px}small,.mu{color:var(--mu)}
+nav{display:flex;gap:6px;overflow-x:auto;padding:10px 16px}
+nav button{white-space:nowrap;border:1px solid var(--bd);background:var(--card);color:var(--tx);padding:8px 14px;border-radius:20px;font-size:14px}
+nav button.on{background:var(--pr);color:var(--pt);border-color:var(--pr)}
+main{padding:0 16px 40px;max-width:900px;margin:auto}
+.c{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
+input,select,textarea{width:100%;padding:9px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit}
+.r{display:flex;gap:8px;flex-wrap:wrap}.r>*{flex:1 1 140px}
+.b{background:var(--pr);color:var(--pt);border:0;border-radius:8px;padding:9px 14px;font:inherit;font-weight:600}
+.g{background:transparent;color:var(--pr);border:1px solid var(--bd)}.d{color:var(--bad)}
+.t{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:7px 6px;border-bottom:1px solid var(--bd);text-align:left}
+td input{padding:6px;min-width:56px}label{font-size:13px;color:var(--mu);display:block;margin:6px 0 3px}
+.ov{display:none;position:fixed;inset:0;background:var(--bg);overflow:auto;padding:16px;z-index:9}.ov.show{display:block}
+.rp{background:#fff;color:#000;max-width:720px;margin:12px auto;padding:20px;border:2px solid #000}
+.rp table{color:#000}.rp th,.rp td{border:1px solid #444;padding:5px}
+@media print{body>*:not(.ov){display:none!important}.ov{position:static;padding:0}.np{display:none!important}.rp{border:2px solid #000;margin:0 auto}}
+</style></head><body>
+<header><h1 id="ttl"></h1><small id="sub"></small> · <small id="ind"></small></header>
+<nav id="nav"></nav><main id="m"></main>
+<div class="ov" id="ov"><div class="np r" style="margin:0 auto;max-width:720px"><button class="b" onclick="window.print()">Print</button><button class="b g" onclick="$('#ov').classList.remove('show')">Close</button><small class="mu" style="flex-basis:100%">If Print does nothing: open this page in Chrome, tap the ⋮ menu, then Share → Print or Save as PDF.</small></div><div class="np" id="bar" style="max-width:720px;margin:10px auto"></div><div id="rp"></div></div>
+<script>
+const $=s=>document.querySelector(s);
+let db;try{db=JSON.parse(localStorage.getItem('sms'))}catch(e){}
+const DS={name:'My School',addr:'',phone:'',session:'2026/2027',term:'First Term',fee:50000,next:'',ca:40,ex:60,gb:'A:70,B:60,C:50,D:45,E:40,F:0',rem:'Excellent result. Keep it up.\nVery good performance.\nGood, but can do better.\nFair. More effort is needed.\nPoor. Needs serious improvement.',subjects:['English','Mathematics','Basic Science','Civic Education','Computer Studies']};
+db=db||{school:{},students:[],scores:{},pays:[],att:{}};db.school={...DS,...db.school};db.cm=db.cm||{};
+const save=()=>{clearTimeout(window._st);window._st=setTimeout(()=>push(),700)};
+const say=m=>{const t=document.createElement('div');t.textContent=m;t.style.cssText='position:fixed;left:12px;right:12px;bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--pr);color:var(--pt);padding:12px;border-radius:10px;z-index:99;text-align:center';document.body.appendChild(t);setTimeout(()=>t.remove(),3000)};
+const uid=()=>Math.random().toString(36).slice(2,9);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const N=n=>'₦'+Number(n||0).toLocaleString();
+const today=()=>new Date().toISOString().slice(0,10);
+let tab='Students',cls='',subj='';
+const tabs=['Students','Results','Fees','Attendance','Settings'];
+const classes=()=>{let c=[...new Set(db.students.map(s=>s.cls))].sort();if(prof&&prof.role==='teacher'){const m=(prof.classes||'').split(',').map(x=>x.trim());c=c.filter(x=>m.includes(x))}return c};
+const inCls=c=>db.students.filter(s=>s.cls===c);
+const grade=t=>{const b=db.school.gb.split(',').map(x=>x.split(':')).map(([g,m])=>[g.trim(),+m]).sort((a,b)=>b[1]-a[1]);return(b.find(x=>t>=x[1])||b[b.length-1])[0]};
+const remark=a=>{const r=db.school.rem.split('\n');return r[a>=70?0:a>=60?1:a>=50?2:a>=40?3:4]||''};
+const avg=id=>sum(id)/db.school.subjects.length;
+const tcm=id=>(db.cm[id]||{}).t||remark(avg(id));
+const ph=p=>{p=String(p||'').replace(/\D/g,'');return p.startsWith('0')?'234'+p.slice(1):p};
+const wa=(s,m)=>`${s.phone?`<a class="b" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block" href="https://wa.me/${ph(s.phone)}?text=${encodeURIComponent(m)}">Send on WhatsApp</a> `:'<small>Add parent phone to send on WhatsApp. </small>'}${s.email?`<a class="b g" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block" href="mailto:${esc(s.email)}?subject=${encodeURIComponent(db.school.name)}&body=${encodeURIComponent(m)}">Send by email</a>`:''}`;
+const sc=(id,s)=>(db.scores[id]||{})[s]||[];
+const tot=(id,s)=>{const x=sc(id,s);return x.length?(+x[0]||0)+(+x[1]||0):null};
+const sum=id=>db.school.subjects.reduce((a,s)=>a+(tot(id,s)||0),0);
+const pos=id=>{const st=db.students.find(x=>x.id===id);const l=inCls(st.cls).map(x=>sum(x.id)).sort((a,b)=>b-a);return l.indexOf(sum(id))+1+' of '+l.length};
+const paid=id=>db.pays.filter(p=>p.sid===id).reduce((a,p)=>a+p.amt,0);
+const opts=(a,v)=>a.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('');
+function clsPick(){const c=classes();if(!c.includes(cls))cls=c[0]||'';return c.length?`<select onchange="cls=this.value;go()">${opts(c,cls)}</select>`:'<p class="mu">Add students first.</p>'}
+function go(t){if(t)tab=t;$('#ttl').textContent=db.school.name;$('#sub').textContent=db.school.session+' · '+db.school.term;
+$('#nav').innerHTML=tabs.map(x=>`<button class="${x===tab?'on':''}" onclick="go('${x}')">${x}</button>`).join('')+'<button onclick="loadAll().then(()=>go())">Refresh</button><button onclick="out()">Log out</button>';
+$('#m').innerHTML=V[tab]();save()}
+const V={
+Students(){const own=db.students.reduce((a,s)=>a+Math.max(s.fee-paid(s.id),0),0);return `<div class="r"><div class="c"><small>Students</small><h2 style="margin:0">${db.students.length}</h2></div><div class="c"><small>Fees collected</small><h2 style="margin:0">${N(db.pays.reduce((a,p)=>a+p.amt,0))}</h2></div><div class="c"><small>Outstanding</small><h2 style="margin:0;color:var(--bad)">${N(own)}</h2></div></div><div class="c"><b>Add student</b><div class="r"><div><label>Full name</label><input id="n"></div><div><label>Class (e.g. JSS 1)</label><input id="c" value="${esc(cls)}"></div><div><label>Parent phone</label><input id="p" type="tel"></div><div><label>Parent email (optional)</label><input id="e" type="email"></div><div><label>Term fee (₦)</label><input id="f" type="number" value="${db.school.fee}"></div></div><p><button class="b" onclick="addS()">Add student</button></p></div>
+<div class="c"><b>Bulk add (saves time)</b><label>Class</label><input id="bc" value="${esc(cls)}"><label>One student per line: Name, phone, email</label><textarea id="bl" rows="4"></textarea><p><button class="b" onclick="bulk()">Import list</button></p></div><div class="c t"><b>${db.students.length} students</b><table><tr><th>Name</th><th>Class</th><th>Phone</th><th></th></tr>${db.students.map(s=>`<tr><td>${esc(s.name)}</td><td>${esc(s.cls)}</td><td>${esc(s.phone)}</td><td><button class="b g d" onclick="delS('${s.id}')">Remove</button></td></tr>`).join('')}</table></div>`},
+Results(){if(!subj||!db.school.subjects.includes(subj))subj=db.school.subjects[0];
+return `<div class="c"><div class="r">${clsPick()}<select onchange="subj=this.value;go()">${opts(db.school.subjects,subj)}</select></div><p><button class="b" onclick="allRep()">Print all report cards for this class</button></p></div>
+<div class="c t"><b>${esc(subj)}</b> <small>CA max ${db.school.ca} · Exam max ${db.school.ex}</small><table><tr><th>Student</th><th>CA</th><th>Exam</th><th>Total</th><th>Grade</th><th></th></tr>${inCls(cls).map(s=>{const x=sc(s.id,subj),t=tot(s.id,subj);return `<tr><td>${esc(s.name)}</td><td><input type="number" min="0" max="${db.school.ca}" value="${x[0]??''}" onchange="setSc('${s.id}',0,this.value)"></td><td><input type="number" min="0" max="${db.school.ex}" value="${x[1]??''}" onchange="setSc('${s.id}',1,this.value)"></td><td id="t${s.id}">${t??''}</td><td id="g${s.id}">${t==null?'':grade(t)}</td><td><button class="b g" onclick="report('${s.id}')">Report</button></td></tr>`}).join('')}</table></div>${rank()}`},
+Fees(){return `<div class="c">${clsPick()}</div><div class="c t"><table><tr><th>Student</th><th>Fee</th><th>Paid</th><th>Owes</th><th></th></tr>${inCls(cls).map(s=>{const p=paid(s.id),o=s.fee-p;return `<tr><td>${esc(s.name)}</td><td>${N(s.fee)}</td><td>${N(p)}</td><td style="color:${o>0?'var(--bad)':'inherit'}">${N(Math.max(o,0))}</td><td><button class="b g" onclick="pay('${s.id}')">Pay</button> <button class="b g" onclick="rcpt('${s.id}')">Receipt</button>${o>0?` <button class="b g" onclick="remind('${s.id}')">Remind</button>`:''}</td></tr>`}).join('')}</table></div>
+<div class="c"><b>Total collected:</b> ${N(db.pays.reduce((a,p)=>a+p.amt,0))}</div>`},
+Attendance(){const d=window.ad||today();window.ad=d;const a=((db.att[d]||{})[cls])||{};
+return `<div class="c"><div class="r">${clsPick()}<input type="date" value="${d}" onchange="ad=this.value;go()"></div></div><div class="c t"><table>${inCls(cls).map(s=>`<tr><td>${esc(s.name)}</td><td><button class="b ${a[s.id]==='P'?'':'g'}" onclick="mark('${s.id}','P')">Present</button> <button class="b ${a[s.id]==='A'?'':'g'} d" onclick="mark('${s.id}','A')">Absent</button></td></tr>`).join('')}</table><p class="mu">Present: ${Object.values(a).filter(v=>v==='P').length} · Absent: ${Object.values(a).filter(v=>v==='A').length}</p></div>`},
+Users(){setTimeout(loadUsers,0);return '<div class="c t" id="us">Loading…</div>'},
+Settings(){const s=db.school;return `<div class="c"><div class="r"><div><label>School name</label><input id="sn" value="${esc(s.name)}"></div><div><label>Address / motto</label><input id="sa" value="${esc(s.addr)}"></div><div><label>Session</label><input id="ss" value="${esc(s.session)}"></div><div><label>Term</label><select id="st">${opts(['First Term','Second Term','Third Term'],s.term)}</select></div><div><label>Default term fee (₦)</label><input id="sf" type="number" value="${s.fee}"></div><div><label>School phone</label><input id="sp" value="${esc(s.phone)}"></div><div><label>Next term begins</label><input id="sx" value="${esc(s.next)}" placeholder="e.g. 12 Jan 2027"></div><div><label>CA max</label><input id="sca" type="number" value="${s.ca}"></div><div><label>Exam max</label><input id="sex" type="number" value="${s.ex}"></div></div><label>Grading (grade:minimum score)</label><input id="sg" value="${esc(s.gb)}"><label>Subjects (comma separated)</label><input id="sj" value="${esc(s.subjects.join(', '))}"><label>Auto teacher comments by average (5 lines: 70+, 60+, 50+, 40+, below 40)</label><textarea id="sr" rows="5">${esc(s.rem)}</textarea><p><button class="b" onclick="saveSet()">Save settings</button></p></div>
+<div class="c"><b>Backup &amp; restore</b><p class="mu">Your data is stored on this device’s browser. Copy the backup text and keep it safe (WhatsApp it to yourself). To restore on another phone, paste it below.</p><textarea id="bk" rows="4">${esc(JSON.stringify(db))}</textarea><p><button class="b g" onclick="$('#bk').select();document.execCommand('copy')">Copy backup</button> <button class="b" onclick="restore()">Restore from text</button></p></div>`}};
+function addS(){const n=$('#n').value.trim(),c=$('#c').value.trim();if(!n||!c)return say('Enter name and class');db.students.push({id:uid(),name:n,cls:c,phone:$('#p').value,email:$('#e').value,fee:+$('#f').value||0});cls=c;go()}
+function delS(id){show(`<div class="rp"><p>Remove this student?</p><p><button class="b d" onclick="delOk('${id}')">Yes, remove</button></p></div>`,1)}
+function delOk(id){db.students=db.students.filter(s=>s.id!==id);$('#ov').classList.remove('show');go()}
+function setSc(id,i,v){const x=db.scores[id]=db.scores[id]||{};const a=x[subj]=x[subj]||[];a[i]=v===''?'':Math.min(+v,i?db.school.ex:db.school.ca);save();const t=tot(id,subj);$('#t'+id).textContent=t;$('#g'+id).textContent=grade(t)}
+function pay(id){const s=db.students.find(x=>x.id===id);show(`<div class="rp"><p>Record payment for <b>${esc(s.name)}</b><br>Owes: ${N(Math.max(s.fee-paid(id),0))}</p><label>Amount paid (₦)</label><input id="pa" type="number" inputmode="numeric"><p><button class="b" onclick="payOk('${id}')">Save and show receipt</button></p></div>`,1)}
+function payOk(id){const v=+$('#pa').value;if(!(v>0))return say('Enter an amount');db.pays.push({id:uid(),sid:id,amt:v,date:today()});go();rcpt(id)}
+function head(){return `<div style="text-align:center"><h2 style="margin:0">${esc(db.school.name)}</h2><div>${esc(db.school.addr)}${db.school.phone?' · '+esc(db.school.phone):''}</div></div><hr>`}
+function show(h,raw,bar){$('#rp').innerHTML=raw?h:'<div class="rp">'+h+'</div>';$('#bar').innerHTML=bar||'';$('#ov').classList.add('show')}
+function rcpt(id){const s=db.students.find(x=>x.id===id),l=db.pays.filter(p=>p.sid===id),p=l[l.length-1];if(!p)return say('No payment yet');
+show(head()+`<h3 style="text-align:center">FEE RECEIPT</h3><p>Receipt No: ${p.id.toUpperCase()}<br>Date: ${p.date}<br>Student: <b>${esc(s.name)}</b> (${esc(s.cls)})<br>${esc(db.school.session)} ${esc(db.school.term)}</p><p>Term fee: ${N(s.fee)}<br>Amount paid now: <b>${N(p.amt)}</b><br>Total paid: ${N(paid(id))}<br>Balance: <b>${N(Math.max(s.fee-paid(id),0))}</b></p><p style="margin-top:30px">Signed: ____________</p>`,0,wa(s,`Receipt from ${db.school.name}: ${s.name} paid ${N(p.amt)} on ${p.date}. Total paid ${N(paid(id))}, balance ${N(Math.max(s.fee-paid(id),0))}. Thank you.`))}
+function card(id){const s=db.students.find(x=>x.id===id),n=db.school.subjects.length,t=sum(id),a=t/n,c=db.cm[id]||{},o=Math.max(s.fee-paid(id),0);
+return head()+`<h3 style="text-align:center">STUDENT REPORT CARD</h3><p>Name: <b>${esc(s.name)}</b> &nbsp; Class: <b>${esc(s.cls)}</b><br>${esc(db.school.session)} · ${esc(db.school.term)}</p><table style="width:100%"><tr><th>Subject</th><th>CA (40)</th><th>Exam (60)</th><th>Total</th><th>Grade</th><th>Remark</th></tr>${db.school.subjects.map(j=>{const x=sc(id,j),T=tot(id,j);return `<tr><td>${esc(j)}</td><td>${x[0]??''}</td><td>${x[1]??''}</td><td>${T??''}</td><td>${T==null?'':grade(T)}</td><td>${T==null?'':({A:'Excellent',B:'Very Good',C:'Good',D:'Fair',E:'Pass',F:'Fail'})[grade(T)]||''}</td></tr>`}).join('')}</table><p>Total: <b>${t}</b> / ${n*100} &nbsp; Average: <b>${a.toFixed(1)}%</b> &nbsp; Position: <b>${pos(id)}</b></p><p>Teacher’s comment: <i>${esc(tcm(id))}</i></p><p>Principal’s comment: <i>${esc(c.p||'')}</i></p><p><b>School fees:</b> ${N(s.fee)} · Paid: ${N(paid(id))} · Balance: <b>${N(o)}</b>${o>0?' (please clear before resumption)':' (fully paid)'}</p>${db.school.next?`<p>Next term begins: <b>${esc(db.school.next)}</b></p>`:''}<p style="margin-top:30px">Teacher: ________ &nbsp; Principal: ________</p><small>Grading: ${esc(db.school.gb.replace(/:/g,' from ').replace(/,/g,', '))}</small>`}
+function report(id){const s=db.students.find(x=>x.id===id),c=db.cm[id]||{};show(card(id),0,`<label>Teacher’s comment (leave blank for auto comment)</label><textarea rows="2" oninput="cm(this.value,'${id}','t')">${esc(c.t||'')}</textarea><label>Principal’s comment</label><textarea rows="2" oninput="cm(this.value,'${id}','p')">${esc(c.p||'')}</textarea><p>${wa(s,`${db.school.name}: ${s.name} (${s.cls}) ${db.school.term} result. Total ${sum(id)}/${db.school.subjects.length*100}, Average ${avg(id).toFixed(1)}%, Position ${pos(id)}. Fee balance ${N(Math.max(s.fee-paid(id),0))}.`)}</p>`)}
+function cm(v,id,k){(db.cm[id]=db.cm[id]||{})[k]=v;save();$('#rp').innerHTML='<div class="rp">'+card(id)+'</div>'}
+function allRep(){const l=inCls(cls);if(l.length)show(l.map(s=>'<div class="rp" style="page-break-after:always">'+card(s.id)+'</div>').join(''),1)}
+function rank(){const l=inCls(cls).map(s=>[s.name,sum(s.id),avg(s.id),pos(s.id)]).sort((a,b)=>b[1]-a[1]);return `<div class="c t"><b>Class ranking</b><table><tr><th>Pos</th><th>Name</th><th>Total</th><th>Avg</th></tr>${l.map(x=>`<tr><td>${x[3].split(' ')[0]}</td><td>${esc(x[0])}</td><td>${x[1]}</td><td>${x[2].toFixed(1)}%</td></tr>`).join('')}</table></div>`}
+function remind(id){const s=db.students.find(x=>x.id===id),o=s.fee-paid(id);show(`<div class="rp"><p>Fee reminder for <b>${esc(s.name)}</b>: outstanding ${N(o)}.</p></div>`,1,wa(s,`Dear Parent, a gentle reminder from ${db.school.name}: ${s.name}’s outstanding school fee for ${db.school.term} is ${N(o)}. Thank you.`))}
+function bulk(){const c=$('#bc').value.trim();if(!c)return say('Enter class');let k=0;$('#bl').value.split('\n').forEach(l=>{const [n,p,e]=l.split(',').map(x=>x.trim());if(n){db.students.push({id:uid(),name:n,cls:c,phone:p||'',email:e||'',fee:db.school.fee});k++}});cls=c;go();say(k+' students added')}
+function mark(id,v){const a=db.att[window.ad]=db.att[window.ad]||{};(a[cls]=a[cls]||{})[id]=v;go()}
+function saveSet(){const s=db.school;s.name=$('#sn').value||'My School';s.addr=$('#sa').value;s.session=$('#ss').value;s.term=$('#st').value;s.fee=+$('#sf').value||0;s.phone=$('#sp').value;s.next=$('#sx').value;s.ca=+$('#sca').value||40;s.ex=+$('#sex').value||60;s.gb=$('#sg').value||DS.gb;s.rem=$('#sr').value||DS.rem;s.subjects=$('#sj').value.split(',').map(x=>x.trim()).filter(Boolean);go()}
+function restore(){try{const d=JSON.parse($('#bk').value);if(!d.school)throw 0;db=d;db.school={...DS,...db.school};db.cm=db.cm||{};go();say('Restored')}catch(e){say('Invalid backup text')}}
+const SB_URL='https://cuyvdzflxqjwgsbgdfzv.supabase.co',SB_KEY='sb_publishable_nP7JGmQ5giC4amcg61-qQw__0J3qCXM';
+let sb,me,prof,last={};
+const ind=m=>{const e=$('#ind');if(e)e.textContent=m};
+function shards(){const o={core:{school:db.school,students:db.students,pays:db.pays,cm:db.cm}};
+for(const st of db.students)for(const [sub,v] of Object.entries(db.scores[st.id]||{})){const k='scores:'+st.cls+':'+sub;(o[k]=o[k]||{})[st.id]=v}
+for(const [d,cs] of Object.entries(db.att))for(const [c,v] of Object.entries(cs))o['att:'+c+':'+d]=v;return o}
+function unshard(rows){db={school:{...DS},students:[],scores:{},pays:[],att:{},cm:{}};for(const r of rows){const p=r.key.split(':'),v=r.val,x=p.slice(2).join(':');
+if(r.key==='core'){db.school={...DS,...v.school};db.students=v.students||[];db.pays=v.pays||[];db.cm=v.cm||{}}
+else if(p[0]==='scores'){for(const id in v)(db.scores[id]=db.scores[id]||{})[x]=v[id]}
+else if(p[0]==='att'){(db.att[x]=db.att[x]||{})[p[1]]=v}}}
+async function push(){if(!me)return;const s=shards(),rows=[];for(const k in s){const j=JSON.stringify(s[k]);if(last[k]!==j)rows.push({key:k,val:s[k],updated_by:me.id,j})}
+if(!rows.length)return;ind('Saving…');const {error}=await sb.from('kv').upsert(rows.map(({j,...r})=>r));if(error)return ind('Not saved: '+error.message);rows.forEach(r=>last[r.key]=r.j);ind('Saved ✓')}
+async function loadAll(){const {data,error}=await sb.from('kv').select('key,val');if(error)return say(error.message);unshard(data);last=shards()}
+function loginUI(msg){$('#nav').innerHTML='';$('#m').innerHTML=`<div class="c"><h3>Sign in</h3>${msg?`<p class="d">${esc(msg)}</p>`:''}<label>Full name (new accounts only)</label><input id="an"><label>Email</label><input id="ae" type="email"><label>Password (min 6 characters)</label><input id="ap" type="password"><p><button class="b" onclick="auth(0)">Log in</button> <button class="b g" onclick="auth(1)">Create account</button></p></div>`}
+async function auth(up){const e=$('#ae').value.trim(),p=$('#ap').value;const r=up?await sb.auth.signUp({email:e,password:p,options:{data:{name:$('#an').value}}}):await sb.auth.signInWithPassword({email:e,password:p});if(r.error)return loginUI(r.error.message);if(up&&!r.data.session)return loginUI('Account created. Please log in.');boot()}
+function waitUI(){$('#nav').innerHTML='';$('#m').innerHTML='<div class="c"><h3>Waiting for approval</h3><p>Ask the school admin to approve your account, then tap Refresh.</p><button class="b" onclick="boot()">Refresh</button> <button class="b g" onclick="out()">Log out</button></div>'}
+const out=()=>sb.auth.signOut().then(boot);
+async function loadUsers(){const {data}=await sb.from('profiles').select('*').order('created_at');$('#us').innerHTML='<b>Approve staff</b><p class="mu">New accounts start as pending. Set the role and, for teachers, the classes they teach (comma separated, written exactly as in Students).</p><table><tr><th>Name</th><th>Role</th><th>Classes</th><th></th></tr>'+data.map(u=>`<tr><td>${esc(u.name||u.email)}</td><td><select id="r${u.id}">${opts(['pending','teacher','admin'],u.role)}</select></td><td><input id="c${u.id}" value="${esc(u.classes||'')}"></td><td><button class="b g" onclick="setU('${u.id}')">Save</button></td></tr>`).join('')+'</table>'}
+async function setU(id){const {error}=await sb.from('profiles').update({role:$('#r'+id).value,classes:$('#c'+id).value}).eq('id',id);say(error?error.message:'Saved')}
+async function boot(){if(SB_URL.startsWith('PASTE')){$('#m').innerHTML='<div class="c">Setup needed: put your Supabase URL and key at the top of the script section.</div>';return}
+sb=sb||supabase.createClient(SB_URL,SB_KEY);const {data:{session}}=await sb.auth.getSession();if(!session){me=null;return loginUI()}me=session.user;
+const {data:p}=await sb.from('profiles').select('*').eq('id',me.id).single();prof=p;if(!p||p.role==='pending')return waitUI();
+await loadAll();tabs.splice(0,tabs.length,...(p.role==='admin'?['Students','Results','Fees','Attendance','Users','Settings']:['Results','Attendance']));tab=tabs[0];cls='';go()}
+boot();
+</script></body></html>
